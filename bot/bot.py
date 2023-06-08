@@ -5,6 +5,7 @@ import traceback
 import html
 import json
 import tempfile
+import requests
 import pydub
 from pathlib import Path
 from datetime import datetime
@@ -396,8 +397,22 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
 
     for i, image_url in enumerate(image_urls):
         await update.message.chat.send_action(action="upload_photo")
-        await update.message.reply_photo(image_url, parse_mode=ParseMode.HTML)
-
+        # Download the image from the URL
+        response = requests.get(image_url)
+        if response.status_code == 200:
+            # Save the image to a file
+            file_path = f"image_{i}.jpg"  # Choose a file name and extension
+            with open(file_path, "wb") as file:
+                file.write(response.content)
+            
+            # Send the saved image back to Telegram
+            with open(file_path, "rb") as file:
+                await update.message.reply_photo(file, parse_mode=ParseMode.HTML)
+            
+            # Remove the saved image file
+            os.remove(file_path)
+        else:
+            await update.message.reply_text("Failed to download the image.")
 
 async def new_dialog_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
