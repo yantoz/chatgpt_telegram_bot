@@ -1,4 +1,11 @@
 assistant:
+
+  name: 👩🏼‍🎓 Unfiltered prompt
+  model_type: text
+  welcome_message: 👩🏼‍🎓 Hi, I'm <b>LocalAI</b>. How can I help you?
+  prompt_start: ""
+  parse_mode: html
+
   name: 👩🏼‍🎓 General Assistant
   model_type: text
   welcome_message: 👩🏼‍🎓 Hi, I'm <b>General Assistant</b>. How can I help you?
