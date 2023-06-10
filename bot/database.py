@@ -1,6 +1,7 @@
-from typing import Optional, Any
 
-import pymongo
+from typing import Any,Optional
+
+# Create an empty dictionary to store data
 import uuid
 from datetime import datetime
 
@@ -8,121 +9,123 @@ import config
 
 
 class Database:
-    def __init__(self):
-        self.client = pymongo.MongoClient(config.mongodb_uri)
-        self.db = self.client["chatgpt_telegram_bot"]
+  def __init__(self):
+    self.database = {}
+  # Define a function to check if a user exists
+  def check_if_user_exists(self, user_id: int, raise_exception: bool = False):
+    if user_id in self.database:
+      return True
+    else:
+      if raise_exception:
+        raise ValueError(f"User {user_id} does not exist")
+      else:
+        return False
 
-        self.user_collection = self.db["user"]
-        self.dialog_collection = self.db["dialog"]
+  # Define a function to add a new user
+  def add_new_user(
+    self,
+    user_id: int,
+    chat_id: int,
+    username: str = "",
+    first_name: str = "",
+    last_name: str = "",
+  ):
+    user_dict = {
+      "chat_id": chat_id,
+      "username": username,
+      "first_name": first_name,
+      "last_name": last_name,
+      "last_interaction": datetime.now(),
+      "first_seen": datetime.now(),
+      "current_dialog_id": None,
+      "current_chat_mode": "assistant",
+      "current_model": config.models["available_text_models"][0],
+      "n_used_tokens": {},
+      "n_generated_images": 0,
+      "n_transcribed_seconds": 0.0 # voice message transcription
+    }
 
-    def check_if_user_exists(self, user_id: int, raise_exception: bool = False):
-        if self.user_collection.count_documents({"_id": user_id}) > 0:
-            return True
-        else:
-            if raise_exception:
-                raise ValueError(f"User {user_id} does not exist")
-            else:
-                return False
+    if not self.check_if_user_exists(user_id):
+      self.database[user_id] = user_dict
 
-    def add_new_user(
-        self,
-        user_id: int,
-        chat_id: int,
-        username: str = "",
-        first_name: str = "",
-        last_name: str = "",
-    ):
-        user_dict = {
-            "_id": user_id,
-            "chat_id": chat_id,
+  # Define a function to start a new dialog
+  def start_new_dialog(self, user_id: int):
+    self.check_if_user_exists(user_id, raise_exception=True)
 
-            "username": username,
-            "first_name": first_name,
-            "last_name": last_name,
+    dialog_id = str(uuid.uuid4())
+    dialog_dict = {
+      "_id": dialog_id,
+      "user_id": user_id,
+      "chat_mode": self.get_user_attribute(user_id, "current_chat_mode"),
+      "start_time": datetime.now(),
+      "model": self.get_user_attribute(user_id, "current_model"),
+      "messages": []
+    }
 
-            "last_interaction": datetime.now(),
-            "first_seen": datetime.now(),
+    # add new dialog
+    self.database[user_id]["current_dialog"] = dialog_dict
 
-            "current_dialog_id": None,
-            "current_chat_mode": "assistant",
-            "current_model": config.models["available_text_models"][0],
+    # update user's current dialog id
+    self.database[user_id]["current_dialog_id"] = dialog_id
 
-            "n_used_tokens": {},
+    return dialog_id
 
-            "n_generated_images": 0,
-            "n_transcribed_seconds": 0.0  # voice message transcription
-        }
+  # Define a function to get a user attribute
+  def get_user_attribute(self, user_id: int, key: str):
+    self.check_if_user_exists(user_id, raise_exception=True)
+    user_dict = self.database[user_id]
 
-        if not self.check_if_user_exists(user_id):
-            self.user_collection.insert_one(user_dict)
+    if key not in user_dict:
+      return None
 
-    def start_new_dialog(self, user_id: int):
-        self.check_if_user_exists(user_id, raise_exception=True)
+    return user_dict[key]
 
-        dialog_id = str(uuid.uuid4())
-        dialog_dict = {
-            "_id": dialog_id,
-            "user_id": user_id,
-            "chat_mode": self.get_user_attribute(user_id, "current_chat_mode"),
-            "start_time": datetime.now(),
-            "model": self.get_user_attribute(user_id, "current_model"),
-            "messages": []
-        }
+  # Define a function to set a user attribute
+  def set_user_attribute(self, user_id: int, key: str, value: Any):
+    self.check_if_user_exists(user_id, raise_exception=True)
+    self.database[user_id][key] = value
 
-        # add new dialog
-        self.dialog_collection.insert_one(dialog_dict)
+  # Define a function to update n used tokens
+  def update_n_used_tokens(self, user_id: int, model: str, n_input_tokens: int, n_output_tokens: int):
+    n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
 
-        # update user's current dialog
-        self.user_collection.update_one(
-            {"_id": user_id},
-            {"$set": {"current_dialog_id": dialog_id}}
-        )
+    if model in n_used_tokens_dict:
+      n_used_tokens_dict[model]["n_input_tokens"] += n_input_tokens
+      n_used_tokens_dict[model]["n_output_tokens"] += n_output_tokens
+    else:
+      n_used_tokens_dict[model] = {
+        "n_input_tokens": n_input_tokens,
+        "n_output_tokens": n_output_tokens
+      }
 
-        return dialog_id
+    self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
 
-    def get_user_attribute(self, user_id: int, key: str):
-        self.check_if_user_exists(user_id, raise_exception=True)
-        user_dict = self.user_collection.find_one({"_id": user_id})
+  # Define a function to get dialog messages
+  def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
+    self.check_if_user_exists(user_id, raise_exception=True)
 
-        if key not in user_dict:
-            return None
+    if dialog_id is None:
+      dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
 
-        return user_dict[key]
+    dialog_dict = self.database[user_id]["current_dialog"]
+    
+    # check if the dialog id matches
+    if dialog_dict["_id"] != dialog_id:
+      raise ValueError(f"Dialog {dialog_id} does not exist for user {user_id}")
 
-    def set_user_attribute(self, user_id: int, key: str, value: Any):
-        self.check_if_user_exists(user_id, raise_exception=True)
-        self.user_collection.update_one({"_id": user_id}, {"$set": {key: value}})
+    return dialog_dict["messages"]
 
-    def update_n_used_tokens(self, user_id: int, model: str, n_input_tokens: int, n_output_tokens: int):
-        n_used_tokens_dict = self.get_user_attribute(user_id, "n_used_tokens")
+  # Define a function to set dialog messages
+  def set_dialog_messages(self, user_id: int, dialog_messages: list, dialog_id: Optional[str] = None):
+    self.check_if_user_exists(user_id, raise_exception=True)
 
-        if model in n_used_tokens_dict:
-            n_used_tokens_dict[model]["n_input_tokens"] += n_input_tokens
-            n_used_tokens_dict[model]["n_output_tokens"] += n_output_tokens
-        else:
-            n_used_tokens_dict[model] = {
-                "n_input_tokens": n_input_tokens,
-                "n_output_tokens": n_output_tokens
-            }
+    if dialog_id is None:
+      dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
 
-        self.set_user_attribute(user_id, "n_used_tokens", n_used_tokens_dict)
+    dialog_dict = self.database[user_id]["current_dialog"]
 
-    def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
-        self.check_if_user_exists(user_id, raise_exception=True)
+    # check if the dialog id matches
+    if dialog_dict["_id"] != dialog_id:
+      raise ValueError(f"Dialog {dialog_id} does not exist for user {user_id}")
 
-        if dialog_id is None:
-            dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
-
-        dialog_dict = self.dialog_collection.find_one({"_id": dialog_id, "user_id": user_id})
-        return dialog_dict["messages"]
-
-    def set_dialog_messages(self, user_id: int, dialog_messages: list, dialog_id: Optional[str] = None):
-        self.check_if_user_exists(user_id, raise_exception=True)
-
-        if dialog_id is None:
-            dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
-
-        self.dialog_collection.update_one(
-            {"_id": dialog_id, "user_id": user_id},
-            {"$set": {"messages": dialog_messages}}
-        )
+    dialog_dict["messages"] = dialog_messages
