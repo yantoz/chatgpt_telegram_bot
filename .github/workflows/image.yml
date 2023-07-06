@@ -17,7 +17,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=quay.io/mudler/telegram-openai-bot
+          DOCKER_IMAGE=quay.io/go-skynet/telegram-bot
           VERSION=main
           SHORTREF=${GITHUB_SHA::8}
 
