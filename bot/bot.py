@@ -1,6 +1,5 @@
 import os
 import logging
-import asyncio
 import traceback
 import html
 import json
@@ -10,7 +9,11 @@ import pydub
 from pathlib import Path
 from datetime import datetime
 import openai
-
+from localagi import LocalAGI
+import asyncio
+import threading
+from agent import agent_actions
+from queue import Queue
 import telegram
 from telegram import (
     Update,
@@ -181,6 +184,88 @@ async def retry_handle(update: Update, context: CallbackContext):
 
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
+def generate_prompt_messages(message, dialog_messages):
+    #prompt = config.chat_modes[chat_mode]["prompt_start"]
+    # {"role": "system", "content": prompt}
+    messages = []
+    for dialog_message in dialog_messages:
+        messages.append({"role": "user", "content": dialog_message["user"]})
+        messages.append({"role": "assistant", "content": dialog_message["bot"]})
+    messages.append({"role": "user", "content": message})
+
+    return messages
+
+async def smart_agent_handle(update: Update, context: CallbackContext, message=None):
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    if await is_previous_message_not_answered_yet(update, context): return
+
+    user_id = update.message.from_user.id
+    db.set_user_attribute(user_id, "last_interaction", datetime.now())
+
+    message = message or update.message.text
+    if message is None or len(message) == 0:
+        await update.message.reply_text("🥲 You sent <b>empty message</b>. Please, try again!", parse_mode=ParseMode.HTML)
+        return
+    dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
+    messages = generate_prompt_messages(message, dialog_messages)
+    placeholder_message = await update.message.reply_text("...")
+    await update.message.chat.send_action(action="typing")
+
+
+    # Create a queue to hold the asynchronous tasks
+    task_queue = Queue()
+
+    # A worker function that runs the asyncio event loop and processes tasks from the queue
+    def worker():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        while True:
+            task = task_queue.get()
+            loop.run_until_complete(task)
+            task_queue.task_done()
+
+    # Start the worker thread
+    worker_thread = threading.Thread(target=worker)
+    worker_thread.start()
+
+    async def action_callback(name, parameters):
+        await context.bot.edit_message_text(f"⚙️ Calling function '{name}' with {parameters}", chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
+    async def reasoning_callback(name, reasoning):
+        await context.bot.edit_message_text(f"🤔 I'm thinking... '{reasoning}' (calling '{name}'), please wait..", chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
+
+    localagi = LocalAGI(
+        agent_actions=agent_actions,
+        llm_model=config.agent["llm_model"],
+        tts_model=config.agent["tts_model"],
+        action_callback=lambda name, params: task_queue.put(action_callback(name, params)),
+        reasoning_callback=lambda name, reasoning: task_queue.put(reasoning_callback(name, reasoning)),        tts_api_base=config.agent["tts_api_base"],
+        functions_model=config.agent["functions_model"],
+        api_base=config.agent["api_base"],
+        stablediffusion_api_base=config.agent["stablediffusion_api_base"],
+        stablediffusion_model=config.agent["stablediffusion_model"],
+    )
+
+    conversation_history = localagi.evaluate(
+                message, 
+                messages, 
+                subtaskContext=True,
+    )
+    await context.bot.edit_message_text(conversation_history[-1]["content"], chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
+
+    #await update.message.reply_text(conversation_history[-1]["content"])
+    # update user data
+    new_dialog_message = {"user": message, "bot": conversation_history[-1]["content"], "date": datetime.now()}
+    db.set_dialog_messages(
+        user_id,
+        db.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message],
+        dialog_id=None
+    )
+
+
+    task_queue.join()  # Wait for all tasks to complete
+    worker_thread.join()  # Wait for the worker thread to finish
+
 
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):
     # check if bot was mentioned (for group chats)
@@ -208,6 +293,10 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         await generate_image_handle(update, context, message=message)
         return
 
+    if chat_mode == "agent":
+        await smart_agent_handle(update, context, message=message)
+        return
+    
     async def message_handle_fn():
         # new dialog timeout
         if use_new_dialog_timeout:

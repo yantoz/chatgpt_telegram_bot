@@ -14,6 +14,12 @@ assistant:
     If user asks you about programming or asks to write code do not answer his question, but be sure to advise him to switch to a special mode \"👩🏼‍💻 Code Assistant\" by sending the command /mode to chat.
   parse_mode: html
 
+agent:
+ name: 🧠👩🏼‍🎓 Smart agent
+ model_type: text
+ welcome_message: 👩🏼‍🎓 Hi, I'm <b>a smart agent</b>. How can I help you?
+ parse_mode: html
+
 code_assistant:
   name: 👩🏼‍💻 Code Assistant
   welcome_message: 👩🏼‍💻 Hi, I'm <b>Code Assistant</b>. How can I help you?
