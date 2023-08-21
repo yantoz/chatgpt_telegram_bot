@@ -64,8 +64,16 @@ def save_file(arg, agent_actions={}, localagi=None):
         os.makedirs(PERSISTENT_DIR)
     # write the file in the directory specified
     filename = os.path.join(PERSISTENT_DIR, filename)
-    with open(filename, 'w') as f:
+
+    # Check if the file already exists
+    if os.path.exists(filename):
+        mode = 'a'  # Append mode
+    else:
+        mode = 'w'  # Write mode
+
+    with open(filename, mode) as f:
         f.write(content)
+
     return f"File {filename} saved successfully."
 
 
