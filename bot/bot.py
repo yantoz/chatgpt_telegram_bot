@@ -195,6 +195,24 @@ def generate_prompt_messages(message, dialog_messages):
 
     return messages
 
+
+# Create a queue to hold the asynchronous tasks
+task_queue = Queue()
+
+# A worker function that runs the asyncio event loop and processes tasks from the queue
+def worker():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    while True:
+        task = task_queue.get()
+        loop.run_until_complete(task)
+        task_queue.task_done()
+
+# Start the worker thread
+worker_thread = threading.Thread(target=worker)
+worker_thread.start()
+
 async def smart_agent_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
@@ -211,23 +229,6 @@ async def smart_agent_handle(update: Update, context: CallbackContext, message=N
     placeholder_message = await update.message.reply_text("...")
     await update.message.chat.send_action(action="typing")
 
-
-    # Create a queue to hold the asynchronous tasks
-    task_queue = Queue()
-
-    # A worker function that runs the asyncio event loop and processes tasks from the queue
-    def worker():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        while True:
-            task = task_queue.get()
-            loop.run_until_complete(task)
-            task_queue.task_done()
-
-    # Start the worker thread
-    worker_thread = threading.Thread(target=worker)
-    worker_thread.start()
 
     async def action_callback(name, parameters):
         await context.bot.edit_message_text(f"⚙️ Calling function '{name}' with {parameters}", chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
@@ -251,6 +252,7 @@ async def smart_agent_handle(update: Update, context: CallbackContext, message=N
                 messages, 
                 subtaskContext=True,
     )
+    task_queue.join()  # Wait for all tasks to complete
     await context.bot.edit_message_text(conversation_history[-1]["content"], chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
 
     #await update.message.reply_text(conversation_history[-1]["content"])
@@ -262,9 +264,6 @@ async def smart_agent_handle(update: Update, context: CallbackContext, message=N
         dialog_id=None
     )
 
-
-    task_queue.join()  # Wait for all tasks to complete
-    worker_thread.join()  # Wait for the worker thread to finish
 
 
 async def message_handle(update: Update, context: CallbackContext, message=None, use_new_dialog_timeout=True):

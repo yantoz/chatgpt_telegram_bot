@@ -27,7 +27,7 @@ EMBEDDINGS_API_BASE = os.environ.get("EMBEDDINGS_API_BASE", "http://api:8080")
 PERSISTENT_DIR = os.environ.get("PERSISTENT_DIR", "/data")
 
 embeddings = LocalAIEmbeddings(model=EMBEDDINGS_MODEL,openai_api_base=EMBEDDINGS_API_BASE)
-chroma_client = Chroma(collection_name="memories", persist_directory="db", embedding_function=embeddings)
+chroma_client = Chroma(collection_name="memories", persist_directory="/data/db", embedding_function=embeddings)
 
 
 ### Agent capabilities
