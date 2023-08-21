@@ -12,7 +12,8 @@ import openai
 from localagi import LocalAGI
 import asyncio
 import threading
-from agent import agent_actions
+from agent import agent_actions,updateHandle
+import agent
 from queue import Queue
 import telegram
 from telegram import (
@@ -216,7 +217,7 @@ worker_thread.start()
 async def smart_agent_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
-
+    agent.updateHandle = update
     user_id = update.message.from_user.id
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 

@@ -3,7 +3,9 @@ import openai
 from langchain.embeddings import LocalAIEmbeddings
 import uuid
 import sys
-
+from queue import Queue
+import asyncio
+import threading
 from localagi import LocalAGI
 from loguru import logger
 from ascii_magic import AsciiArt
@@ -53,7 +55,24 @@ def search_memory(query, agent_actions={}, localagi=None):
     #return text_res
     return localagi.post_process(text_res)
 
+# Create a queue to hold the asynchronous tasks
+task_queue = Queue()
 
+# A worker function that runs the asyncio event loop and processes tasks from the queue
+def worker():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    while True:
+        task = task_queue.get()
+        loop.run_until_complete(task)
+        task_queue.task_done()
+
+# Start the worker thread
+worker_thread = threading.Thread(target=worker)
+worker_thread.start()
+
+updateHandle = None
 # write file to disk with content
 def save_file(arg, agent_actions={}, localagi=None):
     arg = json.loads(arg)
@@ -74,8 +93,14 @@ def save_file(arg, agent_actions={}, localagi=None):
     with open(filename, mode) as f:
         f.write(content)
 
+    if updateHandle is not None:
+       task_queue.put(updateHandle.message.reply_document(
+            document=open(filename, "rb"),
+            filename=filename,
+            caption="result"
+        ))
+    task_queue.join()  # Wait for all tasks to complete
     return f"File {filename} saved successfully."
-
 
 def ddg(query: str, num_results: int, backend: str = "api") -> List[Dict[str, str]]:
     """Run query through DuckDuckGo and return metadata.
