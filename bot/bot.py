@@ -471,6 +471,9 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
 
     message = message or update.message.text
 
+    # remove bot ID from message
+    message = message.replace("@" + context.bot.username, "").strip()
+
     try:
         image_urls = await openai_utils.generate_images(message, n_images=config.return_n_generated_images)
     except openai.error.InvalidRequestError as e:
