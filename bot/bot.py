@@ -214,6 +214,23 @@ def worker():
 worker_thread = threading.Thread(target=worker)
 worker_thread.start()
 
+
+def diff(history, processed):
+    return [item for item in processed if item not in history]
+
+async def analyze_history(history, processed, update):
+    diff_list = diff(history, processed)
+    for item in diff_list:
+        if item["role"] == "function":
+            content = item["content"]
+            # Function result
+            await update.message.reply_text(f"⚙️ Processed: {content}")
+        if item["role"] == "assistant" and "function_call" in item:
+            function_name = item["function_call"]["name"]
+            function_parameters = item["function_call"]["arguments"]
+            # Function call
+            await update.message.reply_text(f"⚙️ Called: {function_name} with {function_parameters}")
+
 async def smart_agent_handle(update: Update, context: CallbackContext, message=None):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
@@ -253,6 +270,7 @@ async def smart_agent_handle(update: Update, context: CallbackContext, message=N
                 messages, 
                 subtaskContext=True,
     )
+    await analyze_history(generate_prompt_messages(message, dialog_messages),conversation_history,update)
     task_queue.join()  # Wait for all tasks to complete
     await context.bot.edit_message_text(conversation_history[-1]["content"], chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
 
