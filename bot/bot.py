@@ -486,6 +486,10 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
 
     await update.message.chat.send_action(action="upload_photo")
+    image_model = db.get_user_attribute(user_id, "current_image_model")
+
+    if image_model is None:
+        image_model = "stablediffusion"
 
     message = message or update.message.text
 
@@ -493,7 +497,7 @@ async def generate_image_handle(update: Update, context: CallbackContext, messag
     message = message.replace("@" + context.bot.username, "").strip()
 
     try:
-        image_urls = await openai_utils.generate_images(message, n_images=config.return_n_generated_images)
+        image_urls = await openai_utils.generate_images(message, n_images=config.return_n_generated_images, model=image_model)
     except openai.error.InvalidRequestError as e:
         if str(e).startswith("Your request was rejected as a result of our safety system"):
             text = "🥲 Your request <b>doesn't comply</b> with OpenAI's usage policies.\nWhat did you write there, huh?"
@@ -666,6 +670,39 @@ def get_settings_menu(user_id: int):
     return text, reply_markup
 
 
+def get_image_settings_menu(user_id: int):
+    current_model = db.get_user_attribute(user_id, "current_image_model")
+    if current_model is None:
+        current_model = "stablediffusion"
+    text = config.models["info"][current_model]["description"]
+
+    text += "\n\n"
+    score_dict = config.models["info"][current_model]["scores"]
+    for score_key, score_value in score_dict.items():
+        text += "🟢" * score_value + "⚪️" * (5 - score_value) + f" – {score_key}\n\n"
+
+    text += "\nSelect <b>model</b>:"
+
+    # buttons to choose models
+    buttons = []
+    # Create groups of 3 buttons for each row
+    for i in range(0, len(config.models["available_image_models"]), 3):
+        row = config.models["available_image_models"][i:i+3]
+        button_row = []
+        for model_key in row:
+            title = config.models["info"][model_key]["name"]
+            if model_key == current_model:
+                title = "✅ " + title
+    
+            button_row.append(
+                InlineKeyboardButton(title, callback_data=f"set_image_settings|{model_key}")
+            )
+        buttons.append(button_row)
+    
+    reply_markup = InlineKeyboardMarkup(buttons)
+    
+    return text, reply_markup
+
 async def settings_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     if await is_previous_message_not_answered_yet(update, context): return
@@ -676,6 +713,34 @@ async def settings_handle(update: Update, context: CallbackContext):
     text, reply_markup = get_settings_menu(user_id)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
 
+async def image_settings_handle(update: Update, context: CallbackContext):
+    await register_user_if_not_exists(update, context, update.message.from_user)
+    if await is_previous_message_not_answered_yet(update, context): return
+
+    user_id = update.message.from_user.id
+    db.set_user_attribute(user_id, "last_interaction", datetime.now())
+
+    text, reply_markup = get_image_settings_menu(user_id)
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+
+
+async def set_image_settings_handle(update: Update, context: CallbackContext):
+    await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
+    user_id = update.callback_query.from_user.id
+
+    query = update.callback_query
+    await query.answer()
+
+    _, model_key = query.data.split("|")
+    db.set_user_attribute(user_id, "current_image_model", model_key)
+    db.start_new_dialog(user_id)
+
+    text, reply_markup = get_image_settings_menu(user_id)
+    try:
+        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode=ParseMode.HTML)
+    except telegram.error.BadRequest as e:
+        if str(e).startswith("Message is not modified"):
+            pass
 
 async def set_settings_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update.callback_query, context, update.callback_query.from_user)
@@ -781,6 +846,7 @@ async def post_init(application: Application):
         BotCommand("/retry", "Re-generate response for previous query"),
         BotCommand("/balance", "Show balance"),
         BotCommand("/settings", "Show settings"),
+        BotCommand("/image_settings", "Show Image generation settings (Artist mode)"),
         BotCommand("/help", "Show help message"),
     ])
 
@@ -821,7 +887,10 @@ def run_bot() -> None:
     application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
 
     application.add_handler(CommandHandler("settings", settings_handle, filters=user_filter))
+    application.add_handler(CommandHandler("image_settings", image_settings_handle, filters=user_filter))
+
     application.add_handler(CallbackQueryHandler(set_settings_handle, pattern="^set_settings"))
+    application.add_handler(CallbackQueryHandler(set_image_settings_handle, pattern="^set_image_settings"))
 
     application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
 

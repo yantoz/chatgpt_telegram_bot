@@ -188,8 +188,8 @@ async def transcribe_audio(audio_file):
     return r["text"]
 
 
-async def generate_images(prompt, n_images=4):
-    r = await openai.Image.acreate(prompt=prompt, n=n_images, size="512x512")
+async def generate_images(prompt, n_images=4, model="stablediffusion"):
+    r = await openai.Image.acreate(prompt=prompt, n=n_images, size="512x512", model=model)
     image_urls = [item.url for item in r.data]
     return image_urls
 
