@@ -654,18 +654,23 @@ def get_settings_menu(user_id: int):
         text += "🟢" * score_value + "⚪️" * (5 - score_value) + f" – {score_key}\n\n"
 
     text += "\nSelect <b>model</b>:"
-
     # buttons to choose models
     buttons = []
-    for model_key in config.models["available_text_models"]:
-        title = config.models["info"][model_key]["name"]
-        if model_key == current_model:
-            title = "✅ " + title
+    # Create groups of 3 buttons for each row
+    for i in range(0, len(config.models["available_text_models"]), 3):
+        row = config.models["available_text_models"][i:i+3]
+        button_row = []
+        for model_key in row:
+            title = config.models["info"][model_key]["name"]
+            if model_key == current_model:
+                title = "✅ " + title
+    
+            button_row.append(
+                InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")
+            )
+        buttons.append(button_row)
 
-        buttons.append(
-            InlineKeyboardButton(title, callback_data=f"set_settings|{model_key}")
-        )
-    reply_markup = InlineKeyboardMarkup([buttons])
+    reply_markup = InlineKeyboardMarkup(buttons)
 
     return text, reply_markup
 
