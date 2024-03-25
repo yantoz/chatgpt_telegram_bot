@@ -3,6 +3,8 @@ import config
 import tiktoken
 import openai
 openai.api_key = config.openai_api_key
+if config.openai_api_base is not None:
+    openai.api_base = config.openai_api_base
 
 
 OPENAI_COMPLETION_OPTIONS = {

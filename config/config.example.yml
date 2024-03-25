@@ -1,5 +1,6 @@
 telegram_token: ""
 openai_api_key: ""
+openai_api_base: "http://api:8080/v1"  # Set the LocalAI API base or set null to use the OpenAI API
 use_chatgpt_api: true
 allowed_telegram_usernames: []  # if empty, the bot is available to anyone. pass a username string to allow it and/or user ids as positive integers and/or channel ids as negative integers
 new_dialog_timeout: 600  # new dialog starts after timeout (in seconds)
