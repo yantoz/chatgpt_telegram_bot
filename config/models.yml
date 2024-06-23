@@ -1,4 +1,5 @@
 available_text_models: ["gpt-3.5-turbo", "gpt-3.5-turbo-16k", "gpt-4", "text-davinci-003"]
+available_image_models: ["stablediffusion"]
 
 info:
   gpt-3.5-turbo:
@@ -56,6 +57,16 @@ info:
   dalle-2:
      type: image
      price_per_1_image: 0.018  # 512x512
+
+  stablediffusion:
+    type: image
+    name: StableDiffusion
+    description: Stablediffusion 512x512
+
+    scores:
+      Smart: 2
+      Fast: 2
+      Cheap: 3
 
   whisper:
     type: audio
