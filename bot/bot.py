@@ -42,6 +42,10 @@ import openai_utils
 
 # setup
 db = database.Database()
+
+LOGLEVEL = os.environ.get('LOGLEVEL','INFO').upper()
+logging.basicConfig(level=LOGLEVEL)
+
 logger = logging.getLogger(__name__)
 
 user_semaphores = {}
