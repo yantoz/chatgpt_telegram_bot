@@ -318,7 +318,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if chat_mode == "agent":
         await smart_agent_handle(update, context, message=message)
         return
-    
+
     async def message_handle_fn():
         # new dialog timeout
         if use_new_dialog_timeout:
@@ -364,24 +364,39 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                 gen = fake_gen()
 
             prev_answer = ""
+            start_index = 0
+            limit = 4096
+
             async for gen_item in gen:
+
                 status, answer, (n_input_tokens, n_output_tokens), n_first_dialog_messages_removed = gen_item
 
-                answer = answer[:4096]  # telegram message limit
-
-                # update only when 100 new symbols are ready
-                if abs(len(answer) - len(prev_answer)) < 100 and status != "finished":
+                # update only when enough new symbols are ready
+                if abs(len(answer) - len(prev_answer)) < 10 and status != "finished" and len(answer[start_index:]) <= limit:
                     continue
 
+                answer_ = answer[start_index:start_index+limit]
+
+                if status != "finished" and len(answer[start_index:]) <= limit:
+                    answer_ += ' ▍'
+
                 try:
-                    await context.bot.edit_message_text(answer, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, parse_mode=parse_mode)
+                    await context.bot.edit_message_text(answer_, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id, parse_mode=parse_mode)
                 except telegram.error.BadRequest as e:
                     if str(e).startswith("Message is not modified"):
                         continue
                     else:
-                        await context.bot.edit_message_text(answer, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
+                        await context.bot.edit_message_text(answer_, chat_id=placeholder_message.chat_id, message_id=placeholder_message.message_id)
 
-                await asyncio.sleep(0.01)  # wait a bit to avoid flooding
+                await asyncio.sleep(0.1)  # wait a bit to avoid flooding
+
+                if len(answer[start_index:]) > limit:
+
+                    # move start to next block
+                    start_index += limit
+
+                    # send new placeholder message to user
+                    placeholder_message = await update.message.reply_text("▍")
 
                 prev_answer = answer
 
