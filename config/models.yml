@@ -1,5 +1,7 @@
 available_text_models: ["gpt-3.5-turbo", "gpt-4", "text-davinci-003"]
 available_image_models: ["stablediffusion"]
+auto_vision_model: gpt-4-vision-preview
+vision_max_size: 512
 
 info:
   gpt-3.5-turbo:
@@ -40,6 +42,19 @@ info:
       Smart: 5
       Fast: 2
       Cheap: 2
+
+  gpt-4-vision-preview:
+    type: chat_completion
+    name: GPT-4 Vision
+    description: Ability to <b>understand images</b>, in addition to all other GPT-4 Turbo capabilties.
+
+    price_per_1000_input_tokens: 0.01
+    price_per_1000_output_tokens: 0.03
+
+    scores:
+      smart: 5
+      fast: 4
+      cheap: 3
 
   text-davinci-003:
     type: completion
