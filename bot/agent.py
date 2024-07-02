@@ -1,6 +1,6 @@
 import openai
 #from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.embeddings import LocalAIEmbeddings
+from langchain_community.embeddings import LocalAIEmbeddings
 import uuid
 import sys
 from queue import Queue
@@ -16,7 +16,7 @@ import requests
 
 from telegram.constants import ParseMode, ChatAction
 
-from langchain.document_loaders import (
+from langchain_community.document_loaders import (
     SitemapLoader,
    # GitHubIssuesLoader,
    # GitLoader,
@@ -30,7 +30,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import urllib.request
 from datetime import datetime
 
-from langchain.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma
 from chromadb.config import Settings
 import json
 import os
