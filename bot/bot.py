@@ -416,7 +416,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
             raise
 
         except Exception as e:
-            error_text = f"Something went wrong during completion. Reason: {e}"
+            error_text = f"Something went wrong during completion: {type(e)} {e}"
             logger.error(error_text)
             await update.message.reply_text(error_text)
             return
@@ -843,6 +843,7 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
 
     try:
         # collect error message
+        """
         tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
         tb_string = "".join(tb_list)
         update_str = update.to_dict() if isinstance(update, Update) else str(update)
@@ -851,6 +852,10 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
             f"<pre>update = {html.escape(json.dumps(update_str, indent=2, ensure_ascii=False))}"
             "</pre>\n\n"
             f"<pre>{html.escape(tb_string)}</pre>"
+        )
+        """
+        message = (
+            f"An exception was raised while handling an update: {type(context.error)} {context.error}"
         )
 
         # split text into multiple messages due to 4096 character limit
