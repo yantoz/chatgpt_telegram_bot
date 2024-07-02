@@ -47,7 +47,8 @@ from PIL import Image
 db = database.Database()
 
 LOGLEVEL = os.environ.get('LOGLEVEL','INFO').upper()
-logging.basicConfig(level=LOGLEVEL)
+FORMAT = '[%(levelname)-7s][%(asctime)-15s][%(name)s] %(message)s'
+logging.basicConfig(format=FORMAT, level=LOGLEVEL)
 
 logger = logging.getLogger(__name__)
 
